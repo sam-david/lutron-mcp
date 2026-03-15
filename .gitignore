@@ -1,0 +1,8 @@
+# Pairing certificates (contain private keys — never commit)
+certs/client.key
+certs/client.crt
+certs/bridge-ca.crt
+
+__pycache__/
+*.pyc
+.env
