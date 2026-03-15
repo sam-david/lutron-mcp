@@ -1,0 +1,5 @@
+secret:
+  ignored_paths:
+    - "certs/connect-lap*.key"
+    - "certs/connect-lap*.crt"
+    - "certs/connect-lap*.pem"
