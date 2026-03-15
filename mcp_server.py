@@ -36,6 +36,7 @@ _reader = None
 _writer = None
 _lock = asyncio.Lock()
 _zone_cache: dict[int, str] = {}
+_zone_type_cache: dict[int, str] = {}  # "Dimmed" or "Switched"
 _area_cache: dict[str, str] = {}
 
 
@@ -102,10 +103,29 @@ async def _ensure_caches():
     for z in zone_resp.get("Body", {}).get("Zones", []):
         zid = int(z["href"].split("/")[-1])
         _zone_cache[zid] = z.get("Name", f"Zone {zid}")
+        _zone_type_cache[zid] = z.get("ControlType", "Dimmed")
 
 
 def _zone_name(zone_id: int) -> str:
     return _zone_cache.get(zone_id, f"Zone {zone_id}")
+
+
+def _make_go_to_level_command(zone_id: int, level: int) -> dict:
+    """Build the correct LEAP command body based on zone control type."""
+    control_type = _zone_type_cache.get(zone_id, "Dimmed")
+    if control_type == "Switched":
+        return {
+            "Command": {
+                "CommandType": "GoToSwitchedLevel",
+                "SwitchedLevelParameters": {"SwitchedLevel": "On" if level > 0 else "Off"},
+            }
+        }
+    return {
+        "Command": {
+            "CommandType": "GoToDimmedLevel",
+            "DimmedLevelParameters": {"Level": level},
+        }
+    }
 
 
 app = Server("lutron")
@@ -244,12 +264,7 @@ async def call_tool(name: str, arguments: dict):
             await _leap_request(
                 "CreateRequest",
                 f"/zone/{zone_id}/commandprocessor",
-                {
-                    "Command": {
-                        "CommandType": "GoToLevel",
-                        "Parameter": [{"Type": "Level", "Value": level}],
-                    }
-                },
+                _make_go_to_level_command(zone_id, level),
             )
             return [TextContent(
                 type="text",
@@ -261,12 +276,7 @@ async def call_tool(name: str, arguments: dict):
             await _leap_request(
                 "CreateRequest",
                 f"/zone/{zone_id}/commandprocessor",
-                {
-                    "Command": {
-                        "CommandType": "GoToLevel",
-                        "Parameter": [{"Type": "Level", "Value": 100}],
-                    }
-                },
+                _make_go_to_level_command(zone_id, 100),
             )
             return [TextContent(
                 type="text",
@@ -278,12 +288,7 @@ async def call_tool(name: str, arguments: dict):
             await _leap_request(
                 "CreateRequest",
                 f"/zone/{zone_id}/commandprocessor",
-                {
-                    "Command": {
-                        "CommandType": "GoToLevel",
-                        "Parameter": [{"Type": "Level", "Value": 0}],
-                    }
-                },
+                _make_go_to_level_command(zone_id, 0),
             )
             return [TextContent(
                 type="text",
